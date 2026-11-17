@@ -1,0 +1,323 @@
+<title>Robot Scritture BC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: one working column, three steps top-to-bottom (carica → controlla → copia), ledger-style tables */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --fg:#17201d; --muted:#5d6b66; --line:#d8e0dc;
+  --accent:#0f6b5f; --accent-fg:#ffffff; --accent-soft:#e2f0ed;
+  --ok:#1d7a3e; --ok-soft:#e3f3e8; --bad:#b3261e; --bad-soft:#fbe7e5; --warn:#8a5a00; --warn-soft:#fbf0d9;
+  --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111816; --surface:#18211e; --fg:#e4ece9; --muted:#97a7a1; --line:#2b3733;
+  --accent:#4fbfae; --accent-fg:#0b1513; --accent-soft:#16312c;
+  --ok:#6fd393; --ok-soft:#173023; --bad:#ff8a80; --bad-soft:#3a1c1a; --warn:#f0c060; --warn-soft:#352a12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --surface:#18211e; --fg:#e4ece9; --muted:#97a7a1; --line:#2b3733;
+  --accent:#4fbfae; --accent-fg:#0b1513; --accent-soft:#16312c;
+  --ok:#6fd393; --ok-soft:#173023; --bad:#ff8a80; --bad-soft:#3a1c1a; --warn:#f0c060; --warn-soft:#352a12; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:1.9rem;font-weight:600;letter-spacing:-.01em}
+h2{font-size:1.15rem;font-weight:600;display:flex;gap:10px;align-items:baseline}
+h2 .n{font-family:var(--f-mono);font-size:.8rem;color:var(--accent);font-weight:500}
+p{margin:0}
+.lead{color:var(--muted);max-width:68ch}
+header{display:grid;gap:8px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
+.hint{color:var(--muted);font-size:.9rem;max-width:75ch}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button,.filebtn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:7px;padding:8px 14px;cursor:pointer}
+button:hover,.filebtn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,.filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+select,input[type=text]{font:inherit;font-size:.9rem;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;width:100%}
+.tag{font-family:var(--f-mono);font-size:.75rem;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.tag.ex{background:var(--warn-soft);color:var(--warn)}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.field{display:grid;gap:4px;padding:10px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.field label{font-size:.82rem;font-weight:600;letter-spacing:.02em}
+.field .fx{display:grid;gap:6px}
+.order{display:grid;gap:6px;max-width:520px}
+.order li{display:grid;grid-template-columns:28px 1fr auto auto auto;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:.9rem}
+.order li.off{opacity:.5}
+.order ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.order .pos{font-family:var(--f-mono);color:var(--muted);font-size:.8rem}
+.order button{padding:2px 8px;font-size:.85rem}
+.stats{display:flex;flex-wrap:wrap;gap:10px}
+.stat{padding:8px 14px;border-radius:8px;border:1px solid var(--line);display:grid}
+.stat b{font-family:var(--f-mono);font-size:1.25rem;font-weight:500}
+.stat span{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat.ok{background:var(--ok-soft);border-color:transparent}.stat.ok b{color:var(--ok)}
+.stat.bad{background:var(--bad-soft);border-color:transparent}.stat.bad b{color:var(--bad)}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;max-height:460px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);font-weight:600;font-size:.78rem;letter-spacing:.03em;z-index:1}
+td.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tr.err td{background:var(--bad-soft)}
+.errs{margin:0;padding-left:18px;color:var(--bad);font-size:.9rem;display:grid;gap:2px}
+.pill{font-size:.75rem;padding:1px 8px;border-radius:99px;font-weight:500}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.steps{margin:0;padding-left:20px;display:grid;gap:4px;max-width:75ch}
+.toast{color:var(--ok);font-weight:500}
+textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:.8rem;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px}
+.radio{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Robot Scritture BC</h1>
+    <p class="lead">Carica il template Excel delle scritture: il robot controlla che ogni documento quadri e prepara le righe già nell'ordine delle colonne del Giornale COGE. Le incolli nel batch e poi registri voi. Il file resta sul tuo PC: viene letto solo dal browser e non viene inviato a nessuno.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span> Carica il template</h2>
+    <div class="row">
+      <label class="filebtn" for="file">Scegli file Excel o CSV<input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv"></label>
+      <button id="sample">Carica esempio</button>
+      <span id="srcTag" class="tag ex">Esempio</span>
+      <span id="srcName" class="hint"></span>
+    </div>
+    <div class="row" id="sheetRow" hidden>
+      <label for="sheet" class="hint">Foglio</label>
+      <select id="sheet" style="width:auto"></select>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span> Collega le colonne</h2>
+    <p class="hint">Per ogni campo di BC scegli la colonna del template da cui prenderlo, oppure un valore fisso uguale per tutte le righe (per esempio Tipo conto = Conto C/G). La scelta viene ricordata in questo browser.</p>
+    <div class="radio" role="radiogroup" aria-label="Importi">
+      <label><input type="radio" name="amode" id="amode1" value="single"> Una colonna Importo (positivo = dare, negativo = avere)</label>
+      <label><input type="radio" name="amode" id="amode2" value="split"> Due colonne Dare e Avere</label>
+    </div>
+    <div class="map" id="map"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span> Ordine delle colonne in BC</h2>
+    <p class="hint">Deve essere identico alle colonne visibili nel vostro Giornale COGE, da sinistra a destra, a partire dalla colonna in cui incollerai. Togli la spunta ai campi che nel vostro batch non sono visibili (o che BC compila da solo, come il Nr. documento con numerazione automatica).</p>
+    <div class="order"><ol id="order"></ol></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span> Controllo</h2>
+    <div class="stats" id="stats"></div>
+    <ul class="errs" id="errs"></ul>
+    <div class="tblwrap"><table id="docs"></table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span> Copia e incolla nel batch</h2>
+    <ol class="steps">
+      <li>Premi <b>Copia righe per BC</b>.</li>
+      <li>In Business Central apri <b>Giornali COGE</b> e scegli il batch.</li>
+      <li>Clicca la prima cella della riga vuota, nella colonna che qui è al numero 1, e premi <b>Ctrl+V</b>.</li>
+      <li>Controlla le righe e i totali in BC, poi premi <b>Registra</b>.</li>
+    </ol>
+    <div class="row">
+      <button class="primary" id="copy">Copia righe per BC</button>
+      <span id="copyMsg" class="toast" role="status"></span>
+    </div>
+    <textarea id="tsv" readonly hidden aria-label="Righe da copiare"></textarea>
+    <div class="tblwrap"><table id="out"></table></div>
+  </section>
+</div>
+
+<script>
+const FIELDS=[
+ {k:"data",l:"Data di registrazione",re:/data.*reg|^data$|posting|data contab/i,req:true},
+ {k:"tipodoc",l:"Tipo documento",re:/tipo.*doc/i},
+ {k:"nrdoc",l:"Nr. documento",re:/^(n|nr|num|numero)[\.\s°]*doc|nr\.? documento|protocollo/i,req:true},
+ {k:"docest",l:"Nr. documento esterno",re:/esterno|ext/i},
+ {k:"tipoconto",l:"Tipo conto",re:/^tipo\s*conto/i},
+ {k:"conto",l:"Nr. conto",re:/^(n|nr|num|numero|cod|codice)?[\.\s]*conto$|nr\.? conto|^conto/i,req:true},
+ {k:"descr",l:"Descrizione",re:/descr/i},
+ {k:"importo",l:"Importo",re:/^importo$|amount/i,amt:"single"},
+ {k:"dare",l:"Dare",re:/dare|debit/i,amt:"split",virt:true},
+ {k:"avere",l:"Avere",re:/avere|credit/i,amt:"split",virt:true},
+ {k:"tipocp",l:"Tipo contropartita",re:/tipo.*contropart/i},
+ {k:"cp",l:"Nr. contropartita",re:/^(n|nr|num|numero|cod)?[\.\s]*contropart|nr\.? contropart/i},
+ {k:"cdc",l:"CDC Codice",re:/cdc|centro.*cost/i},
+ {k:"bu",l:"BU Codice",re:/^bu|business unit/i},
+];
+const OUTKEYS=FIELDS.filter(f=>!f.virt).map(f=>f.k);
+const LS="robotScrittureBC.v1";
+let state={amode:"single",map:{},order:OUTKEYS.map(k=>({k,on:true}))};
+let book=null,rows=[],headers=[],srcName="";
+try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.order)state=Object.assign(state,s);}catch(e){}
+// keep order list in sync with fields
+state.order=state.order.filter(o=>OUTKEYS.includes(o.k));OUTKEYS.forEach(k=>{if(!state.order.find(o=>o.k===k))state.order.push({k,on:true})});
+function save(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fl=k=>FIELDS.find(f=>f.k===k);
+
+const SAMPLE=[
+ ["Data registrazione","N. documento","Tipo conto","Conto","Descrizione","Dare","Avere","CDC","BU"],
+ ["30/11/2026","GIR-2611-001","Conto C/G","60310010","Canone locazione Luisago nov 2026",5052.50,"","51148615","OIL"],
+ ["30/11/2026","GIR-2611-001","Conto C/G","24010020","Rateo canone locazione nov 2026","",5052.50,"",""],
+ ["30/11/2026","GIR-2611-002","Conto C/G","60920010","Imposta di registro quota nov 2026",50.53,"","51148615","OIL"],
+ ["30/11/2026","GIR-2611-002","Conto C/G","18010030","Risconto imposta di registro","",50.53,"",""],
+ ["30/11/2026","GIR-2611-003","Conto C/G","60310010","Conguaglio ISTAT 2026",151.58,"","51148615","OIL"],
+ ["30/11/2026","GIR-2611-003","Conto C/G","24010020","Debito conguaglio ISTAT","",150.00,"",""],
+];
+
+function loadAoa(aoa,name,isSample){
+  // header row = first row with ≥2 non-empty cells
+  let h=aoa.findIndex(r=>r&&r.filter(c=>String(c??"").trim()!=="").length>=2);
+  if(h<0)h=0;
+  headers=(aoa[h]||[]).map((c,i)=>String(c??"").trim()||("Colonna "+(i+1)));
+  rows=aoa.slice(h+1).filter(r=>r&&r.some(c=>String(c??"").trim()!==""));
+  srcName=name;$("srcTag").hidden=!isSample;$("srcName").textContent=isSample?"Dati di esempio, non reali":name+" · "+rows.length+" righe";
+  autoMap();renderMap();run();
+}
+function autoMap(){
+  FIELDS.forEach(f=>{
+    const cur=state.map[f.k];
+    if(cur&&cur.t==="col"&&headers.includes(cur.v))return;
+    if(cur&&cur.t==="fix")return;
+    const i=headers.findIndex(h=>f.re.test(h));
+    state.map[f.k]=i>=0?{t:"col",v:headers[i]}:(f.k==="tipoconto"?{t:"fix",v:"Conto C/G"}:{t:"none"});
+  });
+  // if no Importo column but Dare/Avere exist, switch mode
+  if(state.map.importo.t!=="col"&&(state.map.dare.t==="col"||state.map.avere.t==="col"))state.amode="split";
+  if(state.map.importo.t==="col"&&state.map.dare.t!=="col")state.amode="single";
+  save();
+}
+function renderMap(){
+  $("amode1").checked=state.amode==="single";$("amode2").checked=state.amode==="split";
+  $("map").innerHTML=FIELDS.filter(f=>!f.amt||f.amt===state.amode).map(f=>{
+    const m=state.map[f.k]||{t:"none"};
+    const sel=`<option value="none"${m.t==="none"?" selected":""}>(vuoto)</option><option value="fix"${m.t==="fix"?" selected":""}>(valore fisso)</option>`+
+      headers.map(h=>`<option value="col:${esc(h)}"${m.t==="col"&&m.v===h?" selected":""}>${esc(h)}</option>`).join("");
+    return `<div class="field"><label for="m_${f.k}">${esc(f.l)}${f.req?" *":""}</label><div class="fx">
+      <select id="m_${f.k}" data-k="${f.k}">${sel}</select>
+      <input type="text" id="f_${f.k}" data-k="${f.k}" value="${m.t==="fix"?esc(m.v):""}" placeholder="Valore fisso" ${m.t==="fix"?"":"hidden"}></div></div>`;
+  }).join("");
+}
+$("map").addEventListener("change",e=>{
+  const k=e.target.dataset.k;if(!k||e.target.tagName!=="SELECT")return;
+  const v=e.target.value;
+  state.map[k]=v==="none"?{t:"none"}:v==="fix"?{t:"fix",v:""}:{t:"col",v:v.slice(4)};
+  save();renderMap();run();
+});
+$("map").addEventListener("input",e=>{
+  const k=e.target.dataset.k;if(!k||e.target.tagName!=="INPUT")return;
+  state.map[k]={t:"fix",v:e.target.value};save();run();
+});
+document.querySelectorAll('input[name=amode]').forEach(r=>r.addEventListener("change",e=>{state.amode=e.target.value;save();renderMap();run();}));
+
+function renderOrder(){
+  let n=0;
+  $("order").innerHTML=state.order.map((o,i)=>`<li class="${o.on?"":"off"}"><span class="pos">${o.on?++n:"–"}</span><span>${esc(fl(o.k).l)}</span>
+    <input type="checkbox" id="on_${o.k}" data-i="${i}" ${o.on?"checked":""} aria-label="Includi ${esc(fl(o.k).l)}">
+    <button data-up="${i}" ${i===0?"disabled":""} aria-label="Sposta su">↑</button><button data-dn="${i}" ${i===state.order.length-1?"disabled":""} aria-label="Sposta giù">↓</button></li>`).join("");
+}
+$("order").addEventListener("click",e=>{
+  const u=e.target.dataset.up,d=e.target.dataset.dn;
+  if(u!==undefined){const i=+u;[state.order[i-1],state.order[i]]=[state.order[i],state.order[i-1]];}
+  else if(d!==undefined){const i=+d;[state.order[i+1],state.order[i]]=[state.order[i],state.order[i+1]];}
+  else return;save();renderOrder();run();
+});
+$("order").addEventListener("change",e=>{const i=e.target.dataset.i;if(i===undefined)return;state.order[+i].on=e.target.checked;save();renderOrder();run();});
+
+// ---- value helpers ----
+function raw(r,k){const m=state.map[k];if(!m||m.t==="none")return "";if(m.t==="fix")return m.v;const i=headers.indexOf(m.v);return i<0?"":r[i];}
+function pad(n){return String(n).padStart(2,"0")}
+function toDate(v){
+  if(v===""||v==null)return null;
+  if(typeof v==="number"&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*86400000);return pad(d.getUTCDate())+"/"+pad(d.getUTCMonth()+1)+"/"+d.getUTCFullYear();}
+  if(v instanceof Date&&!isNaN(v))return pad(v.getDate())+"/"+pad(v.getMonth()+1)+"/"+v.getFullYear();
+  const s=String(v).trim();let m;
+  if(m=s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})$/)){let y=+m[3];if(y<100)y+=2000;const dd=+m[1],mm=+m[2];if(mm<1||mm>12||dd<1||dd>31)return null;return pad(dd)+"/"+pad(mm)+"/"+y;}
+  if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))return m[3]+"/"+m[2]+"/"+m[1];
+  return null;
+}
+function toNum(v){
+  if(v===""||v==null)return 0;
+  if(typeof v==="number")return v;
+  let s=String(v).replace(/[€\s]/g,"");if(!s)return 0;
+  if(/,\d{1,}$/.test(s)||/\.\d{3},/.test(s))s=s.replace(/\./g,"").replace(",",".");
+  else s=s.replace(/,/g,"");
+  const n=Number(s);return isNaN(n)?NaN:n;
+}
+const r2=n=>Math.round(n*100)/100;
+const fmtIT=n=>r2(n).toFixed(2).replace(".",",");
+const fmtShow=n=>r2(n).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
+const clean=s=>String(s??"").replace(/[\t\r\n]+/g," ").trim();
+
+let out=[],okToCopy=false;
+function run(){
+  const errs=[];out=[];
+  rows.forEach((r,idx)=>{
+    const line=idx+1;const o={line,e:[]};
+    OUTKEYS.forEach(k=>{if(k!=="importo")o[k]=clean(raw(r,k));});
+    const d=toDate(raw(r,"data"));o.data=d||clean(raw(r,"data"));if(!d)o.e.push("data non valida");
+    let amt;
+    if(state.amode==="single")amt=toNum(raw(r,"importo"));
+    else{const a=toNum(raw(r,"dare")),b=toNum(raw(r,"avere"));amt=(isNaN(a)||isNaN(b))?NaN:a-b;}
+    if(isNaN(amt))o.e.push("importo non numerico");else if(r2(amt)===0)o.e.push("importo zero");
+    o.amt=isNaN(amt)?0:r2(amt);o.importo=fmtIT(o.amt);
+    if(!o.conto)o.e.push("manca il Nr. conto");
+    if(!o.nrdoc)o.e.push("manca il Nr. documento");
+    out.push(o);
+  });
+  // balance per documento (righe senza contropartita)
+  const docs=new Map();
+  out.forEach(o=>{const key=o.nrdoc||"(senza numero)";if(!docs.has(key))docs.set(key,{doc:key,dates:new Set(),dare:0,avere:0,n:0,cp:0});
+    const g=docs.get(key);g.n++;g.dates.add(o.data);
+    if(o.cp){g.cp++;}else{if(o.amt>0)g.dare+=o.amt;else g.avere-=o.amt;}});
+  const docList=[...docs.values()].map(g=>{g.diff=r2(g.dare-g.avere);g.ok=Math.abs(g.diff)<0.005&&g.dates.size===1;return g;});
+  docList.forEach(g=>{if(Math.abs(g.diff)>=0.005)errs.push(`Documento ${g.doc}: non quadra, differenza ${fmtShow(g.diff)} €`);
+    if(g.dates.size>1)errs.push(`Documento ${g.doc}: righe con date diverse (${[...g.dates].join(", ")})`);});
+  out.forEach(o=>o.e.length&&errs.push(`Riga ${o.line} del template: ${o.e.join(", ")}`));
+  const rowErr=out.filter(o=>o.e.length).length,docErr=docList.filter(g=>!g.ok).length;
+  const totD=docList.reduce((s,g)=>s+g.dare,0);
+  $("stats").innerHTML=`<div class="stat"><b>${out.length}</b><span>Righe</span></div>
+   <div class="stat"><b>${docList.length}</b><span>Documenti</span></div>
+   <div class="stat"><b>${fmtShow(totD)}</b><span>Totale dare €</span></div>
+   <div class="stat ${errs.length?"bad":"ok"}"><b>${errs.length}</b><span>${errs.length?"Errori da correggere":"Errori · pronto"}</span></div>`;
+  $("errs").innerHTML=errs.slice(0,50).map(e=>`<li>${esc(e)}</li>`).join("")+(errs.length>50?`<li>…e altri ${errs.length-50}</li>`:"");
+  $("docs").innerHTML=`<thead><tr><th>Nr. documento</th><th>Data</th><th>Righe</th><th class="num">Dare</th><th class="num">Avere</th><th class="num">Differenza</th><th>Stato</th></tr></thead><tbody>`+
+    docList.map(g=>`<tr class="${g.ok?"":"err"}"><td>${esc(g.doc)}</td><td>${esc([...g.dates].join(", "))}</td><td>${g.n}${g.cp?` (${g.cp} con contropartita)`:""}</td><td class="num">${fmtShow(g.dare)}</td><td class="num">${fmtShow(g.avere)}</td><td class="num">${fmtShow(g.diff)}</td><td><span class="pill ${g.ok?"ok":"bad"}">${g.ok?"Quadra":"Da correggere"}</span></td></tr>`).join("")+"</tbody>";
+  // output preview
+  const cols=state.order.filter(o=>o.on).map(o=>o.k);
+  $("out").innerHTML=`<thead><tr>${cols.map((k,i)=>`<th>${i+1}. ${esc(fl(k).l)}</th>`).join("")}</tr></thead><tbody>`+
+    out.map(o=>`<tr class="${o.e.length?"err":""}">${cols.map(k=>`<td class="${k==="importo"?"num":""}">${esc(o[k])}</td>`).join("")}</tr>`).join("")+"</tbody>";
+  $("tsv").value=out.map(o=>cols.map(k=>o[k]).join("\t")).join("\r\n");
+  okToCopy=out.length>0&&errs.length===0;
+  $("copy").disabled=!okToCopy;
+  $("copyMsg").textContent=out.length&&!okToCopy?"Correggi gli errori al punto 4 per abilitare la copia.":"";
+  $("copyMsg").style.color=okToCopy?"var(--ok)":"var(--bad)";
+}
+$("copy").addEventListener("click",()=>{
+  const t=$("tsv").value;
+  const done=()=>{$("copyMsg").style.color="var(--ok)";$("copyMsg").textContent=`Copiate ${out.length} righe. Ora incolla in BC con Ctrl+V.`;};
+  const fallback=()=>{$("tsv").hidden=false;$("tsv").focus();$("tsv").select();$("copyMsg").style.color="var(--warn)";$("copyMsg").textContent="Copia automatica non disponibile: il testo è selezionato qui sotto, premi Ctrl+C.";};
+  try{navigator.clipboard.writeText(t).then(done,fallback);}catch(e){fallback();}
+});
+
+$("file").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const buf=await f.arrayBuffer();
+    book=XLSX.read(buf,{type:"array",raw:false,cellDates:false});
+    const ss=$("sheet");ss.innerHTML=book.SheetNames.map(n=>`<option>${esc(n)}</option>`).join("");
+    $("sheetRow").hidden=book.SheetNames.length<2;
+    loadSheet(book.SheetNames[0],f.name);
+  }catch(err){$("srcName").textContent="Non riesco a leggere il file: salvalo come .xlsx o .csv e riprova.";}
+});
+function loadSheet(n,name){const aoa=XLSX.utils.sheet_to_json(book.Sheets[n],{header:1,raw:true,defval:""});loadAoa(aoa,name+(book.SheetNames.length>1?" · "+n:""),false);}
+$("sheet").addEventListener("change",e=>loadSheet(e.target.value,srcName.split(" · ")[0]));
+$("sample").addEventListener("click",()=>loadAoa(SAMPLE,"esempio",true));
+
+renderOrder();loadAoa(SAMPLE,"esempio",true);
+</script>
